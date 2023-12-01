@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<head>
+
+<style>
+	body{
+		background-color: OldLace;
+		font-size: 100%;
+	}
+	h1{
+		text-align: center;
+		font-family: "Roboto";
+		line-height: 0.2;
+		font-size: clamp(20px, 4.5vw, 60px);
+	}
+	h2{
+		text-align: center;
+		text-decoration: overline;
+		font-family: "Roboto";
+		font-size: clamp(15px, 1.5vw, 25px);;
+	}
+/* Nav Bar Style */
+	img{
+		display: block;
+		max-width: 100%;
+		height: auto;
+		margin-left: auto;
+		margin-right: auto;
+	}
+	
+	a{
+		text-align: left;
+		font-family: "Roboto";
+	}
+	
+	ul {
+		list-style-type: none;
+		margin: 0;
+		padding: 0;
+		overflow: hidden;
+		background-color: #333;
+	}
+
+	li {
+		float: left;
+	}
+
+	li a {
+	  display: block;
+	  font-family: "Roboto";
+	  color: white;
+	  text-align: center;
+	  padding: 14px 16px;
+	  text-decoration: none;
+	}
+	li a:hover{
+		background-color: #111;
+	}
+</style>
+
+</head>
+
+<body>
+<!-- Nav Bar Links -->
+<ul>
+  <li><a href="default.asp">Home</a></li><br><br><br>
+  <li><a href="news.asp">News</a></li>
+  <li><a href="contact.asp">Contact</a></li>
+  <li><a href="about.asp">About</a></li>
+</ul> <br>
+se
+<h1> SAPA Replay Repository</h1>
+<h2>Created by the SAPA Archivist</h2>
+<img src=
+"/images/logoOld.png" 
+alt="SAPA" 
+style="width:252px;height:252px";> <br>
+
+<a href = "/Season10/season10.html"> Season 10 </a>
+</body>
+</html>
