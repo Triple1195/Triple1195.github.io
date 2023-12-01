@@ -1,21 +1,210 @@
 <!DOCTYPE html>
 <html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<head>
+<style>
+	body{
+		background-color: OldLace;
+		font-size: 100%;
+	}
+	h1{
+		text-align: center;
+		font-family: "Tahoma";
+		line-height: 0.2;
+		font-size: clamp(20px, 4.5vw, 40px);
+	}
+	h2{
+		text-align: center;
+		text-decoration: overline;
+		font-family: "Tahoma";
+		font-size: clamp(15px, 1.5vw, 25px);
+	}
+	h4{
+		text-align: left;
+		text-decoration: underline;
+		font-family: "Tahoma";
+		font-weight: bold;
+		font-size: clamp(15px, 1.5vw, 20px);
+	}
+	
+
+		img{
+		display: block;
+		max-width: 100%;
+		height: auto;
+		margin-left: auto;
+		margin-right: auto;
+	}
+	
+/* Nav Bar Style --------------------------------------------------------------		*/
+	ul {
+	  list-style-type: none;
+	  margin: 0;
+	  padding: 0;
+	  overflow: hidden;
+	  background-color: #333;
+	}
+
+	li {
+	  float: left;
+	}
+
+	li a, .dropbtn {
+	  display: inline-block;
+	  color: white;
+	  text-align: center;
+	  padding: 14px 16px;
+	  text-decoration: none;
+	  font-family: "Tahoma";
+	  font-weight: bold;
+	  font-size: clamp(12px,1.5vw,18px);
+	}
+
+	li a:hover, .dropdown:hover .dropbtn {
+	  background-color: Black;
+	}
+
+	li.dropdown {
+	  display: inline-block;
+	}
+
+	.dropdown-content {
+	  display: none;
+	  position: absolute;
+	  background-color: #f9f9f9;
+	  min-width: 160px;
+	  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+	  z-index: 1;
+	}
+
+	.dropdown-content a {
+	  color: black;
+	  padding: 12px 16px;
+	  text-decoration: none;
+	  display: block;
+	  text-align: left;
+	  font-size: clamp(12px, 1.5vw, 18px);
+	}
+
+	.dropdown-content a:hover {background-color: #f1f1f1;}
+
+	.dropdown:hover .dropdown-content {
+	  display: block;
+	}
+/* End Nav Bar Style --------------------------------------------------------------		*/
+
+/* Collapsible Style --------------------------------------------------------------		*/
+.collapsible {
+  background-color: #777;
+  color: white;
+  cursor: pointer;
+  padding: 18px;
+  width: 100%;
+  border: none;
+  text-align: left;
+  outline: none;
+  font-size: 15px;
+}
+
+.active, .collapsible:hover {
+  background-color: #555;
+}
+
+.content {
+  padding: 0 18px;
+  display: none;
+  overflow: hidden;
+  background-color: NavajoWhite;
+}
+/* End Collapsible Style --------------------------------------------------------------	*/
+
+/* Button Style ----------------------------------------------------------------------	*/
+	.btn-group .button {
+		background-color: #04AA6D; /* Green */
+		border: 1px solid black;
+		color: white;
+		padding: 15px 32px;
+		text-align: center;
+		text-decoration: none;
+		display: inline-block;
+		cursor: pointer;
+		float: left;
+		width: 33%;
+		margin: auto;
+		font-family: "Tahoma";
+		font-size: clamp(12px, 1.5vw, 14px);
+	}
+
+	.btn-group, .button:hover {
+		background-color: #3e8e41;
+	}
+/* End Button Style ---------------------------------------------------------------	*/
+</style>
+</head>
 <body>
+
+<!-- Nav Bar -->
+<ul>
+	<li><a href="/index.html">Home</a></li>
+	<li class="dropdown">
+		<a href="javascript:void(0)" class="dropbtn">Seasons</a>
+		<div class="dropdown-content">
+		  <a href="#">Season 1</a>
+		  <a href="#">Season 2</a>
+		  <a href="#">Season 3</a>
+		  <a href = "/Season10/season10.html"> Season 10 </a>
+		</div>
+		</li>
+	<li style="float:right"><a href="#about">The Association</a></li>
+		<li style="float:right"><a href="#news">News</a></li>
+</ul>
 <h1>Season 10 Repository</h1>
-<h2>Week 16</h2>
 
-<h4>Bannon vs Brian</h4>
-<a href = "/Season10/Week16/S10_W16_BannonVsBrian_Game1.html" target="_blank"> Game 1 </a><br>
-<a href = "/Season10/Week16/S10_W16_BannonVsBrian_Game2.html" target="_blank"> Game 2 </a><br>
-<a href = "/Season10/Week16/S10_W16_BannonVsBrian_Game3.html" target="_blank"> Game 3 </a><br>
+<!-- Week 16 Collapsible -->
+<button type="button" class="collapsible">Week 16</button>
+<div class="content">
 
-<h4>JT vs Matt</h4>
-<a href = "/Season10/Week16/S10_W16_JTvsMatt_Game1.html" target="_blank"> Game 1 </a><br>
-<a href = "/Season10/Week16/S10_W16_JTvsMatt_Game2.html" target="_blank"> Game 2 </a><br>
-<a href = "/Season10/Week16/S10_W16_JTvsMatt_Game3.html" target="_blank"> Game 3 </a><br>
+	<h4>Bannon vs Brian</h4>
+	<div class="btn-group">
+	  <a href = "/Season10/Week16/S10_W16_BannonVsBrian_Game1.html" target="_blank"><button class="button"> Game 1 </button></a>
+	  <a href = "/Season10/Week16/S10_W16_BannonVsBrian_Game2.html" target="_blank"><button class="button"> Game 2 </button></a>
+	  <a href = "/Season10/Week16/S10_W16_BannonVsBrian_Game3.html" target="_blank"><button class="button"> Game 3 </button></a>
+	</div><br><br><br>
 
-<h4>Will vs Adam</h4>
-<a href = "/Season10/Week16/S10_W16_WillVsAdam_Game1.html" target="_blank"> Game 1 </a><br>
-<a href = "/Season10/Week16/S10_W16_WillVsAdam_Game2.html" target="_blank"> Game 2 </a><br>
+	<h4>JT vs Matt</h4>
+	<div class="btn-group">
+	  <a href = "/Season10/Week16/S10_W16_JTvsMatt_Game1.html" target="_blank"><button class="button"> Game 1 </button></a>
+	  <a href = "/Season10/Week16/S10_W16_JTvsMatt_Game2.html" target="_blank"><button class="button"> Game 2 </button></a>
+	  <a href = "/Season10/Week16/S10_W16_JTvsMatt_Game3.html" target="_blank"><button class="button"> Game 3 </button></a>
+	</div><br><br><br>
+	
+	<h4>Will vs Adam</h4>
+	<div class="btn-group">
+	  <a href = "/Season10/Week16/S10_W16_WillVsAdam_Game1.html" target="_blank"><button class="button"> Game 1 </button></a>
+	  <a href = "/Season10/Week16/S10_W16_WillVsAdam_Game2.html" target="_blank"><button class="button"> Game 2 </button></a>
+	</div><br><br><br>
+
+</div>
+
+
+
+<!-- Collapsible Script -->
+<script>
+var coll = document.getElementsByClassName("collapsible");
+var i;
+
+for (i = 0; i < coll.length; i++) {
+  coll[i].addEventListener("click", function() {
+    this.classList.toggle("active");
+    var content = this.nextElementSibling;
+    if (content.style.display === "block") {
+      content.style.display = "none";
+    } else {
+      content.style.display = "block";
+    }
+  });
+}
+</script>
+<!-- End Collapsible Script -->
 </body>
 </html>
