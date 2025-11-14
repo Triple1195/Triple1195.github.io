@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Showdown Replay Analyzer (Faint Source & KOs)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f9;
+        }
+        th, td {
+            padding: 12px 10px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            white-space: nowrap; 
+        }
+        th {
+            background-color: #4b5563;
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+        tr:hover {
+            background-color: #f3f4f6;
+        }
+        .scroll-container {
+            overflow-x: auto;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .pokemon-cell {
+            font-size: 0.875rem;
+            color: #1f2937;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 1rem;
+            height: 1rem;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Custom styling for Nickname cells */
+        .nickname-cell {
+            font-size: 0.8rem;
+            color: #4b5563;
+            font-style: italic;
+            background-color: #f9fafb; 
+        }
+        /* Custom styling for Faint Type cells */
+        .faint-cell {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            background-color: #eff6ff; /* Light blue background */
+            color: #1e40af;
+        }
+        /* Custom styling for Source cells */
+        .source-cell {
+            font-size: 0.8rem;
+            color: #374151; /* Darker gray */
+            background-color: #f0fdf4; /* Light green background */
+        }
+        /* Custom styling for Move cells */
+        .move-cell {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #5b21b6; /* Purple for moves */
+            background-color: #f5f3ff; /* Light purple background */
+        }
+        /* Custom styling for KO Count cells */
+        .ko-cell {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-align: center;
+            background-color: #fefce8; /* Light yellow for emphasis */
+            color: #ca8a04;
+        }
+		.damage-cell {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-align: center;
+            background-color: #fefce8; /* Light yellow for emphasis */
+            color: #ca8a04;
+        }
+        .container {
+            max-width: 95%;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="container bg-white p-6 md:p-8 rounded-xl shadow-2xl">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Pokémon Showdown Replay Team Extractor</h1>
+        
+        <div id="message-box" class="hidden p-3 mb-4 rounded-lg text-sm" role="alert"></div>
+
+        <div class="flex flex-col md:flex-row gap-4 mb-8">
+            <input type="url" id="replayUrl" placeholder="Paste Pokémon Showdown Replay URL (e.g., https://replay.pokemonshowdown.com/...)"
+                   class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                   value="https://replay.pokemonshowdown.com/gen6draft-2417422935">
+            
+            <button id="processButton" class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-150 ease-in-out shadow-md flex items-center justify-center">
+                <span id="buttonText">Process Replay</span>
+                <div id="buttonSpinner" class="spinner ml-2 hidden"></div>
+            </button>
+            
+            <button id="copyButton" class="bg-green-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-green-700 transition duration-150 ease-in-out shadow-md">
+                Copy Data
+            </button>
+        </div>
+
+        <div id="table-container" class="scroll-container hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="sticky left-0 bg-gray-600 text-white z-10">Replay ID</th>
+                        <th>Winner</th>
+                        <th>Loser</th>
+                        <th>Turns</th>
+                        <!-- Winner Team Columns (Species + Nickname + Faint Type + Faint Source + Faint Move + DKO + IKO + SKO) -->
+                        <th title="Winner Pokémon 1">WP1</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                        <th title="Winner Pokémon 2">WP2</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                        <th title="Winner Pokémon 3">WP3</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                        <th title="Winner Pokémon 4">WP4</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                        <th title="Winner Pokémon 5">WP5</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                        <th title="Winner Pokémon 6">WP6</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                        <!-- Loser Team Columns (Species + Nickname + Faint Type + Faint Source + Faint Move + DKO + IKO + SKO) -->
+                        <th title="Loser Pokémon 1">LP1</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                        <th title="Loser Pokémon 2">LP2</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                        <th title="Loser Pokémon 3">LP3</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                        <th title="Loser Pokémon 4">LP4</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                        <th title="Loser Pokémon 5">LP5</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                        <th title="Loser Pokémon 6">LP6</th><th>Nick</th><th>Faint</th><th>Source</th><th>Move</th><th title="Direct KOs">DKO</th><th title="Indirect KOs">IKO</th><th title="Self KOs">SKO</th><th title="Total Damage">TD</th><th title="Direct Damage">DD</th><th title="Indirect Damage">ID</th><th title="Hazard Damage">HD</th><th title="Hits Taken">HT</th><th title="Damage Taken">DT</th><th title="Damage Healed">DH</th><th title="Active Turns">AT</th><th title="Survived">Surv</th><th title="Fainted">Faint</th><th title="Battle Won">BW</th>
+                    </tr>
+                </thead>
+                <tbody id="replayTableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- Data rows will be injected here -->
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+        // --- HARDCODED PLAYER NAME MAP ---
+        const PLAYER_NAME_MAP = {
+            '4reo': 'Aaron', 'poppynoodle': 'Adam', 'bafrednn': 'Bannon',
+            'superyoshibros': 'Brian', 'oshasafetyguy': 'Chris', 'drfrappuccino': 'Cory',
+            'shlowbro': 'Dante', 'gooigi88': 'David', 'obseen': 'Ernest',
+            'fletchington': 'Fletchington', 'frank456758': 'Frank', 'mfsusan': 'Hall',
+            'hclint44': 'Hank', 'theladylike': 'Izzy', 'devoidlazarus': 'Jordan',
+            'scrubcabbage': 'Josh', 'triplex1195': 'JT', 'lilymoding': 'Lily',
+            'xltwinmattress': 'Matt', 'ventusverus': 'Patrick', 'kingofspaghetti0': 'THT',
+            'timr35': 'Tim', 'verysinistea': 'Vivi', 'crispywill': 'Will',
+        };
+        // ---------------------------------
+        
+        // --- Core Utility Functions ---
+ // --- Core Fetching Function (Replaces _getJsonData) ---
+/**
+ * Fetches and parses JSON data from a URL using the browser's native 'fetch' API.
+ * Uses a CORS proxy to bypass cross-origin restrictions common with external APIs.
+ *
+ * @param {string} url The URL of the JSON data.
+ * @returns {Promise<Object>} The parsed JSON object.
+ * @throws {Error} Throws an error if the network request fails or the HTTP status is not okay.
+ */
+async function getJsonData(u) {
+    // FIX: Prepend a CORS proxy URL to bypass the 'Failed to fetch' cross-origin error.
+	const url = u + ".json";
+    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+    const finalUrl = proxyUrl + encodeURIComponent(url);
+    
+    console.log("Fetching URL via proxy:", finalUrl);
+
+    const response = await fetch(finalUrl);
+
+    if (!response.ok) {
+        // Throw an error with the status for the caller to catch
+        throw new Error(`HTTP Error: Failed to fetch data. Status: ${response.status} (${response.statusText}). The original URL may be inaccessible or have CORS issues.`);
+    }
+
+    // Return the parsed JSON object
+    return await response.json();
+}
+
+function _getPlayerDetails(data, players, playerIdentifier) {
+  let targetPlayerName;
+  let playerTag; // "p1" or "p2"
+
+  if (playerIdentifier === 1 || playerIdentifier === "1") {
+    targetPlayerName = players[0];
+    playerTag = "p1";
+  } else if (playerIdentifier === 2 || playerIdentifier === "2") {
+    targetPlayerName = players[1];
+    playerTag = "p2";
+  } else if (playerIdentifier.toLowerCase() === "winner") {
+    targetPlayerName = getWinner(data);
+    if (targetPlayerName === players[0]) {
+      playerTag = "p1";
+    } else if (targetPlayerName === players[1]) {
+      playerTag = "p2";
+    }
+  } else if (playerIdentifier.toLowerCase() === "loser") {
+    targetPlayerName = getLoser(data);
+    if (targetPlayerName === players[0]) {
+      playerTag = "p1";
+    } else if (targetPlayerName === players[1]) {
+      playerTag = "p2";
+    }
+  } else {
+    // Assume it's a player name and find the corresponding tag
+    targetPlayerName = playerIdentifier;
+    if (targetPlayerName === players[0]) {
+      playerTag = "p1";
+    } else if (targetPlayerName === players[1]) {
+      playerTag = "p2";
+    }
+  }
+
+  if (targetPlayerName && playerTag) {
+    return { targetPlayerName, playerTag };
+  }
+  return null;
+}
+
+function _getNicknameToSpeciesMap(log, playerTag) {
+	const map = {};
+	const logLines = log.split('\n');
+	logLines.forEach(line => {
+		// First, handle initial switch-ins
+		if (line.startsWith(`|switch|${playerTag}`) || line.startsWith(`|drag|${playerTag}`)) {
+			const parts = line.split('|');
+			const nickname = parts[2].split(': ')[1].trim();
+			let species = parts[3].split(',')[0].trim();
+			if (species.endsWith("-*")) {
+				species = species.slice(0, -2);
+			}
+			// Only set if not already a mega or prinal form
+			if (!map[nickname] || !(map[nickname].includes("-Mega") || map[nickname].includes("-Primal") || map[nickname].includes("-Gmax"))) {
+				map[nickname] = species;
+			}
+		}
+		// Then, check for detailschange to overwrite with a Mega/Primal form
+		if (line.startsWith(`|detailschange|${playerTag}`) && !line.includes('[silent]')) {
+			const parts = line.split('|');
+			const nickname = parts[2].split(': ')[1].trim();
+			const newSpecies = parts[3].split(',')[0].trim();
+			
+			if (newSpecies.includes("-Mega") || newSpecies.includes("-Primal") || newSpecies.includes("-Gmax")) {
+				map[nickname] = newSpecies;
+			}
+		}
+	});
+	return map;
+}
+
+function _getPokemonList(log, playerTag) {
+	const logLines = log.split('\n');
+	const initialPokemon = [];
+	const pokemonForms = new Map(); // Key: Initial species, Value: Final species (Mega, etc.)
+	const nicknameToInitialSpecies = new Map(); // Key: Nickname, Value: Initial species
+
+	// First pass: Find the initial team from |poke| tags and map nicknames.
+	logLines.forEach(line => {
+		if (line.startsWith(`|poke|${playerTag}|`)) {
+			const parts = line.split('|');
+			let pokemonName = parts[3].split(',')[0].trim();
+			if (pokemonName.endsWith("-*")) {
+				pokemonName = pokemonName.slice(0, -2);
+			}
+			if (!initialPokemon.includes(pokemonName)) {
+				initialPokemon.push(pokemonName);
+			}
+		}
+		// Also build a map of initial nicknames to species for lookup later.
+		if (line.startsWith(`|switch|${playerTag}`) || line.startsWith(`|drag|${playerTag}`)) {
+			const parts = line.split('|');
+			const nickname = parts[2].split(': ')[1].trim();
+			const species = parts[3].split(',')[0].trim();
+			if (!nicknameToInitialSpecies.has(nickname)) {
+				nicknameToInitialSpecies.set(nickname, species);
+			}
+		}
+	});
+
+	// Second pass: Track form changes and prioritize Mega/Primal forms.
+	logLines.forEach(line => {
+		if (line.startsWith(`|detailschange|${playerTag}`) && !line.includes('[silent]')) {
+			const parts = line.split('|');
+			const nickname = parts[2].split(': ')[1].trim();
+			const newSpecies = parts[3].split(',')[0].trim();
+			
+			// Get the initial species for this Pokémon
+			let initialSpecies = nicknameToInitialSpecies.get(nickname);
+			
+			// If we found the initial species and the new form is a Mega, Primal, etc.
+			if (initialSpecies && (newSpecies.includes("-Mega") || newSpecies.includes("-Primal") || newSpecies.includes("-Gmax"))) {
+				pokemonForms.set(initialSpecies, newSpecies);
+			}
+		}
+	});
+
+	// Final step: Build the final list based on initial team order and confirmed forms.
+	const finalPokemonList = initialPokemon.map(species => {
+		if (pokemonForms.has(species)) {
+			return pokemonForms.get(species);
+		} else {
+			return species;
+		}
+	});
+
+	return finalPokemonList;
+}
+
+function _getFaintCauseAndSourceFromIndirectDamage(logLines, faintIndex, faintingPokemonNickname, faintingPokemonBaseSpecies, opponentPlayerTag, opponentNicknameMap, faintingPlayerTag, faintingPlayerNicknameMap = {}) {
+    /**
+     * Helper to find the species name from the log itself, as a fallback to the nickname map.
+     * Searches backwards from the given index to find the most recent switch-in for a nickname.
+     *
+     * @param {Array<string>} logLines The full log as an array of lines.
+     * @param {string} nickname The nickname to search for.
+     * @param {number} startIndex The index in the log to begin the search.
+     * @returns {string|null} The species name, or null if not found.
+     */
+    function _getSpeciesFromLog(logLines, nickname, startIndex) {
+        for (let i = startIndex; i >= 0; i--) {
+            const line = logLines[i];
+            // Check for a switch line that includes the nickname
+            if (line.startsWith('|switch|')) {
+                const parts = line.split('|');
+                // The switch line format is |switch|p1a: Nickname|Species, G|HP
+                if (parts[2] && parts[2].includes(nickname)) {
+                    // The species is the fourth part of the line.
+                    return parts[3].split(',')[0].trim();
+                }
+            }
+        }
+        return null;
+    }
+
+    // Find the damage line that directly caused the faint.
+    let damageLineIndex = faintIndex - 1;
+    while (damageLineIndex >= 0 && (!logLines[damageLineIndex].includes('|-damage|') || !(logLines[damageLineIndex].includes(faintingPokemonNickname) || logLines[damageLineIndex].includes(faintingPokemonBaseSpecies)))) {
+        damageLineIndex--;
+    }
+    const damageLine = logLines[damageLineIndex];
+
+    if (!damageLine) {
+        return { source: "Unknown", move: "Unknown" };
+    }
+
+    // Handle delayed damage from moves like Future Sight.
+    // The damage line itself doesn't contain the source; we must look for a preceding |-end| line.
+    for (let j = faintIndex - 1; j >= 0; j--) {
+        const line = logLines[j];
+        if (line.startsWith('|-end|') && line.includes('move: Future Sight') && line.includes(faintingPokemonNickname)) {
+            // We found the end line, now search back for the original move line.
+            for (let k = j - 1; k >= 0; k--) {
+                const moveLine = logLines[k];
+                if (moveLine.startsWith('|move|') && moveLine.includes(`|Future Sight|`) && moveLine.includes(opponentPlayerTag)) {
+                    const parts = moveLine.split('|');
+                    const sourceNickname = parts[2].split(': ')[1].trim();
+                    const sourceSpecies = opponentNicknameMap[sourceNickname] || _getSpeciesFromLog(logLines, sourceNickname, k) || sourceNickname;
+                    return { source: sourceSpecies, move: "Future Sight" };
+                }
+            }
+        }
+    }
+    
+    // Handle Rocky Helmet damage. The `[from] item: Rocky Helmet` tag is key.
+    if (damageLine.includes('[from] item: Rocky Helmet')) {
+      const sourceTagMatch = damageLine.match(/\[of\]\s(p[12]a:\s[\w\s-]+)/);
+      if (sourceTagMatch) {
+          const sourcePokemonNickname = sourceTagMatch[1].split(': ')[1].trim();
+          const sourceSpecies = opponentNicknameMap[sourcePokemonNickname] || _getSpeciesFromLog(logLines, sourcePokemonNickname, damageLineIndex) || sourcePokemonNickname;
+          return { source: sourceSpecies, move: "Rocky Helmet" };
+      }
+      return { source: "Unknown", move: "Rocky Helmet" };
+    }
+
+    // Handle damage from abilities like Iron Barbs or Rough Skin.
+    const abilityMatch = damageLine.match(/\[from\] ability: (Iron Barbs|Rough Skin)/);
+    if (abilityMatch) {
+        const abilityName = abilityMatch[1];
+        const sourceTagMatch = damageLine.match(/\[of\]\s(p[12]a:\s[\w\s-]+)/);
+        if (sourceTagMatch) {
+            const sourcePokemonNickname = sourceTagMatch[1].split(': ')[1].trim();
+            const sourceSpecies = opponentNicknameMap[sourcePokemonNickname] || _getSpeciesFromLog(logLines, sourcePokemonNickname, damageLineIndex) || sourcePokemonNickname;
+            return { source: sourceSpecies, move: abilityName };
+        }
+        return { source: "Unknown", move: abilityName };
+    }
+    
+    // Handle weather damage (Sandstorm, Hail)
+    if (damageLine.includes('[from] Sandstorm') || damageLine.includes('[from] Hail')) {
+      const weatherName = damageLine.includes('Sandstorm') ? 'Sandstorm' : 'Hail';
+      // Search the log for the weather-starting event
+      for (let j = 0; j < faintIndex; j++) {
+          const line = logLines[j];
+          // The weather-starting line has a weather tag and a `[from]` tag
+          if (line.startsWith(`|-weather|${weatherName}`) && line.includes('[from]')) {
+              const ofTagMatch = line.match(/\[of\]\s(p[12]a:\s[\w\s-]+)/);
+              if (ofTagMatch) {
+                  const sourcePokemonTag = ofTagMatch[1];
+                  const sourcePokemonNickname = sourcePokemonTag.split(': ')[1].trim();
+                  
+                  // Determine which nickname map to use based on the source player tag
+                  const sourcePlayerTag = sourcePokemonTag.includes(opponentPlayerTag) ? opponentPlayerTag : faintingPlayerTag;
+                  const sourceNicknameMap = (sourcePlayerTag === opponentPlayerTag) ? opponentNicknameMap : faintingPlayerNicknameMap;
+
+                  const sourceSpecies = sourceNicknameMap[sourcePokemonNickname] || _getSpeciesFromLog(logLines, sourcePokemonNickname, j) || sourcePokemonNickname;
+                  return { source: sourceSpecies, move: weatherName };
+              }
+          }
+      }
+      // Fallback if the weather starter wasn't found in the log
+      return { source: "Unknown", move: weatherName };
+    }
+
+    // Handle status and residual damage (poison, burn, etc.)
+    if (damageLine.includes('[from] status') || damageLine.includes('[from] residual') || damageLine.includes('[from] psn') || damageLine.includes('[from] tox') || damageLine.includes('[from] brn')) {
+        const statusMatch = damageLine.match(/\[from\]\s(?:status:\s)?([a-z]+)/);
+        const status = statusMatch ? statusMatch[1].toUpperCase() : 'UNKNOWN';
+
+        // Check specifically for Toxic Spikes
+        if (damageLine.includes('[from] psn') || damageLine.includes('[from] tox')) {
+            // Find the log line where the status was applied from Toxic Spikes
+            for (let i = 0; i < faintIndex; i++) {
+                const line = logLines[i];
+                if (line.startsWith(`|-sidestart|${faintingPlayerTag}: `) && line.includes('move: Toxic Spikes')) {
+                    // Now find the move that set up the Toxic Spikes
+                    for (let j = i - 1; j >= 0; j--) {
+                        const moveLine = logLines[j];
+                        if (moveLine.startsWith('|move|') && moveLine.includes(`|Toxic Spikes|`) && moveLine.includes(opponentPlayerTag)) {
+                            const parts = moveLine.split('|');
+                            const sourceNickname = parts[2].split(': ')[1].trim();
+                            const sourceSpecies = opponentNicknameMap[sourceNickname] || _getSpeciesFromLog(logLines, sourceNickname, j) || sourceNickname;
+                            return { source: sourceSpecies, move: "Toxic Spikes (PSN)" };
+                        }
+                    }
+                }
+            }
+        }
+        
+        // General status handling if not Toxic Spikes
+        // Search backward from the damage line to find the status-inducing move
+        for (let j = damageLineIndex - 1; j >= 0; j--) {
+            const line = logLines[j];
+            if (line.startsWith('|-status|') && (line.includes(faintingPokemonNickname) || line.includes(faintingPokemonBaseSpecies))) {
+                // Now, search backward from the status line to find the move that caused it.
+                for (let k = j - 1; k >= 0; k--) {
+                    const moveLine = logLines[k];
+                    if (moveLine.startsWith('|move|') && moveLine.includes(`|${opponentPlayerTag}`)) {
+                        const parts = moveLine.split('|');
+                        const sourceNickname = parts[2].split(': ')[1].trim();
+                        const sourceSpecies = opponentNicknameMap[sourceNickname] || _getSpeciesFromLog(logLines, sourceNickname, k) || sourceNickname;
+                        const move = parts[3].trim();
+                        return { source: sourceSpecies, move: `${move} (${status})` };
+                    }
+                }
+            }
+        }
+        return { source: "Unknown", move: `(Status) (${status})` }; // Fallback
+    }
+
+    // Handle Confusion
+    if (damageLine.includes('[from] confusion')) {
+        const moveName = "Confusion Damage";
+        for (let j = damageLineIndex - 1; j >= 0; j--) {
+            const moveLine = logLines[j];
+            if (moveLine.startsWith('|move|') && (moveLine.includes(faintingPokemonNickname) || moveLines[j].includes(faintingPokemonBaseSpecies))) {
+                const parts = moveLine.split('|');
+                const sourceNickname = parts[2].split(': ')[1].trim();
+                const sourceSpecies = opponentNicknameMap[sourceNickname] || _getSpeciesFromLog(logLines, sourcePokemonNickname, j) || sourcePokemonNickname;
+                const move = parts[3].trim();
+                return { source: sourceSpecies, move: `${move} (Confusion)` };
+            }
+        }
+    }
+
+    // Handle entry hazards (Stealth Rock, Spikes)
+    if (damageLine.includes('[from] Stealth Rock') || damageLine.includes('[from] Spikes')) {
+        const hazardName = damageLine.includes('Stealth Rock') ? 'Stealth Rock' : 'Spikes';
+        // Search the entire log for the move that set the hazard on the fainting player's side.
+        for (let j = 0; j < faintIndex; j++) {
+            const line = logLines[j];
+            // Use a more specific check to ensure we only get moves from the opponent
+            if (line.startsWith(`|move|${opponentPlayerTag}a:`) && line.includes(`|${hazardName}|`)) {
+                // We found the move that set the hazard.
+                const parts = line.split('|');
+                const sourceNickname = parts[2].split(': ')[1].trim();
+                const sourceSpecies = opponentNicknameMap[sourceNickname] || _getSpeciesFromLog(logLines, sourceNickname, j) || sourceNickname;
+                const move = parts[3].trim();
+                return { source: sourceSpecies, move: move };
+            }
+        }
+        // Fallback if the move wasn't found (e.g., hazard was already set at the start).
+        return { source: "Unknown", move: hazardName };
+    }
+
+    // Handle other indirect sources (Leech Seed, Sticky Barb)
+    if (damageLine.includes('[from] Leech Seed')) {
+        const parts = damageLine.split('[of]');
+        const sourcePokemonTag = parts[1].trim().split('\n')[0];
+        const sourceNickname = sourcePokemonTag.split(': ')[1].trim();
+        const sourceSpecies = opponentNicknameMap[sourceNickname] || _getSpeciesFromLog(logLines, sourceNickname, damageLineIndex) || sourceNickname;
+        return { source: sourceSpecies, move: "Leech Seed" };
+    }
+    if (damageLine.includes('[from] item: Sticky Barb')) {
+        return { source: "Sticky Barb", move: "Sticky Barb" };
+    }
+
+    return { source: "Unknown", move: "Unknown" };
+}
+
+function getForfeit(data, playerTag) {
+    // Extracts the log and player names from the parsed JSON.
+    const log = data.log;
+    const players = json.players;
+
+    // Determines the player's index based on their tag ('p1' is index 0, 'p2' is index 1).
+    const playerIdentifier = (playerTag === 'p1' ? 0 : 1);
+    
+    // Gets the player's name from the players array.
+    const playerName = players[playerIdentifier];
+
+    // Constructs the specific message that indicates a forfeit.
+    // The format is "|-message|{Player Name} forfeited."
+    const forfeitMessage = `|-message|${playerName} forfeited.`;
+
+    // Checks if the log string contains the constructed forfeit message.
+    if (log.includes(forfeitMessage)) {
+      Logger.log(`Player ${playerName} (${playerTag}) forfeited.`);
+      return true;
+    }
+    // Constructs the specific message that indicates inactivity.
+    // The format is "|-message|{Player Name} lost due to inactivity.."
+    const inactiveMessage = `|-message|${playerName} lost due to inactivity.`;
+
+    // Checks if the log string contains the constructed forfeit message.
+    if (log.includes(inactiveMessage)) {
+      Logger.log(`Player ${playerName} (${playerTag}) lost due to inactivity.`);
+      return true;
+    }
+    // If the message is not found, the player did not forfeit.
+    Logger.log(`Player ${playerName} (${playerTag}) did not forfeit.`);
+    return false;
+
+}
+
+function getWinner(data) {
+  // Get the battle log string.
+  const log = data.log;
+
+  // The winner is declared at the end of the log with the tag "|win|".
+  // We split the log by this tag to get the part containing the winner's name.
+  const winnerLine = log.split('|win|')[1];
+
+  if (winnerLine) {
+    // Split the winnerLine by the newline character and take the first part
+    // to ensure we only get the player's name and nothing else.
+    const winnerName = winnerLine.split('\n')[0].trim();
+    return winnerName;
+  } else {
+    // Return a message if the "|win|" tag is not found.
+    return "Winner not found.";
+  }
+}
+
+function getLoser(data) {
+
+  // Get the players array.
+  const players = data.players;
+
+  // Find the winner's name by calling the getWinner function.
+  const winnerName = getWinner(data);
+
+  if (winnerName === "Winner not found.") {
+    return "Loser not found.";
+  }
+
+  // Filter the players array to find the player who is not the winner.
+  const loserName = players.find(player => player !== winnerName);
+
+  if (loserName) {
+    return loserName;
+  } else {
+    return "Loser not found.";
+  }
+}
+
+function getTurns(data) {
+  // Get the battle log string.
+  const log = data.log;
+
+  // Split the log by the '|turn|' tag. The last element of the array
+  // will contain the final turn number at its beginning.
+  const turnLines = log.split('|turn|');
+
+  // Get the last element of the array, which should contain the final turn number.
+  // The first part of this string will be the number, followed by a newline.
+  const lastTurnLine = turnLines[turnLines.length - 1];
+
+  // Extract the number from the string and convert it to an integer.
+  // We use parseInt to handle any leading or trailing whitespace.
+  const turnNumber = parseInt(lastTurnLine.split('\n')[0].trim(), 10);
+
+  if (turnNumber && !isNaN(turnNumber)) {
+    return turnNumber;
+  } else {
+    return "Number of turns not found.";
+  }
+}
+
+function getPokemon(data, playerIdentifier, pokemonId) {
+	const log = data.log;
+  const players = data.players;
+
+  const playerDetails = _getPlayerDetails(data, players, playerIdentifier);
+  if (!playerDetails) {
+    return "Player not found.";
+  }
+  const { playerTag } = playerDetails;
+
+  // Use the new helper function to get the pokemon list
+  const pokemonList = _getPokemonList(log, playerTag);
+
+  if (pokemonId > 0 && pokemonId <= pokemonList.length) {
+    // Arrays are 0-indexed, so we subtract 1 from pokemonId
+    return pokemonList[pokemonId - 1];
+  } else {
+    return "Pokémon not found for the specified ID.";
+  }
+}
+
+function getNickname(data, playerIdentifier, pokemonId) {
+	const log = data.log;
+	const players = data.players;
+	const playerDetails = _getPlayerDetails(data, players, playerIdentifier);
+	if (!playerDetails) {
+		return "Player not found.";
+	}
+	const { playerTag } = playerDetails;
+
+	const logLines = log.split('\n');
+	
+	const initialPokemonOrder = [];
+	const nicknameMap = new Map();
+
+	// First, establish the initial team order from |poke| lines
+	for (const line of logLines) {
+		if (line.startsWith(`|poke|${playerTag}|`)) {
+			const parts = line.split('|');
+			let species = parts[3].split(',')[0].trim();
+			if (species.endsWith("-*")) {
+				species = species.slice(0, -2);
+			}
+			initialPokemonOrder.push(species);
+		}
+		// Also, collect nicknames as Pokémon are sent out
+		if ((line.startsWith(`|switch|${playerTag}`) || line.startsWith(`|drag|${playerTag}`)) && !line.includes('fainted')) {
+			const parts = line.split('|');
+			const species = parts[3].split(',')[0].trim();
+			const nickname = parts[2].split(': ')[1].trim();
+			// Map the initial species to its nickname if not already mapped
+			if (!nicknameMap.has(species)) {
+				nicknameMap.set(species, nickname);
+			}
+		}
+	}
+	
+	if (pokemonId < 1 || pokemonId > initialPokemonOrder.length) {
+		return "Nickname not found for the specified Pokémon ID.";
+	}
+	
+	// Get the initial species for the requested Pokémon ID
+	const targetSpecies = initialPokemonOrder[pokemonId - 1];
+	
+	// Use the species to find the corresponding nickname
+	const foundNickname = nicknameMap.get(targetSpecies);
+	
+	if (foundNickname) {
+		return foundNickname;
+	} else {
+		// Fallback to species name if no nickname was found
+		return targetSpecies;
+	}
+}
+
+function getBattleWon(data, playerIdentifier, pokemonId) {
+  const players = data.players;
+
+  const playerDetails = _getPlayerDetails(data, players, playerIdentifier);
+  if (!playerDetails) {
+    return "Error: Player not found.";
+  }
+
+  const winnerName = getWinner(data);
+  if (winnerName === "Winner not found.") {
+    return "Error: Winner not found.";
+  }
+
+  if (playerDetails.targetPlayerName === winnerName) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+function getFaintType(data, playerIdentifier, pokemonId) {
+  const log = data.log;
+  const players = data.players;
+
+  const playerDetails = _getPlayerDetails(data, players, playerIdentifier);
+  if (!playerDetails) {
+    return "Player not found.";
+  }
+  const { playerTag } = playerDetails;
+  const opponentPlayerTag = (playerTag === 'p1' ? 'p2' : 'p1');
+
+  const pokemonList = _getPokemonList(log, playerTag);
+  if (pokemonId < 1 || pokemonId > pokemonList.length) {
+    return "Pokémon not found for the specified ID.";
+  }
+
+  const targetPokemonNickname = getNickname(data, playerIdentifier, pokemonId);
+  if (targetPokemonNickname.includes("not found")) {
+    return "Pokémon not found for the specified ID.";
+  }
+  
+  const logLines = log.split('\n');
+  let faintIndex = -1;
+
+  // First, try to find the faint line using the nickname.
+  for (let i = 0; i < logLines.length; i++) {
+    const line = logLines[i];
+    if (line.startsWith(`|faint|${playerTag}`) && line.includes(targetPokemonNickname)) {
+      faintIndex = i;
+      break;
+    }
+  }
+
+  // If the nickname didn't find the faint, fall back to the species name.
+  if (faintIndex === -1) {
+    const targetPokemonSpecies = pokemonList[pokemonId - 1];
+    for (let i = 0; i < logLines.length; i++) {
+      const line = logLines[i];
+      if (line.startsWith(`|faint|${playerTag}`) && line.includes(targetPokemonSpecies)) {
+        faintIndex = i;
+        break;
+      }
+    }
+  }
+  
+  if (faintIndex === -1) {
+    return "N/A";
+  }
+  
+  // Define self-KO moves and other self-faint conditions
+  const selfKO_moves = [
+    "Self-Destruct", "Explosion", "Final Gambit", "Memento", "Healing Wish", "Misty Explosion", "Lunar Dance"
+  ];
+
+  // Search backward from the faint line to find the cause
+  for (let i = faintIndex - 1; i >= 0; i--) {
+    const line = logLines[i];
+
+    if (line.startsWith('|turn|')) {
+      break; // Stop if we reach a new turn
+    }
+
+    // Check for delayed damage moves like Future Sight
+    if (line.startsWith('|-end|') && line.includes('move: Future Sight')) {
+      return "Indirect";
+    }
+
+    // Check for direct move first. This is a more explicit check for direct faints.
+    if (line.startsWith('|move|') && line.includes(`|${opponentPlayerTag}`)) {
+      const parts = line.split('|');
+      const moveTarget = parts[4];
+      // Check if the move's target is the fainted pokemon
+      if (moveTarget && moveTarget.includes(targetPokemonNickname)) {
+        return "Direct";
+      }
+    }
+
+    // Check for self-KO moves.
+    if (line.startsWith('|move|') && selfKO_moves.some(move => line.includes(move)) && line.includes(targetPokemonNickname)) {
+      return "Self";
+    }
+    
+    // Check for damage lines with "from" tags for indirect and self-inflicted damage.
+    if (line.startsWith('|-damage|')) {
+      const parts = line.split('|');
+      const damagedPokemon = parts[2]; // The second part of the line is the damaged Pokemon's full tag (e.g., "p1a:Lopunny")
+      
+      // We must make sure the damaged pokemon is the one that fainted.
+      // This fixes the bug where Rocky Helmet damage on the opponent was being incorrectly attributed to the fainted pokemon.
+      if (damagedPokemon && damagedPokemon.includes(targetPokemonNickname)) {
+        if (line.includes('[from]')) {
+          if (line.includes('[from] Recoil') || line.includes('[from] recoil') || line.includes('[from] item: Life Orb') ||
+            line.includes('[from] item: Sticky Barb') || line.includes('[from] highjumpkick') || line.includes('[from] confusion')) {
+            return "Self";
+          } else if (line.includes('[from] ability:') || line.includes('[from] item:')) {
+            return "Indirect";
+          } else {
+            // Other cases with a 'from' tag, like hazards, are indirect.
+            return "Indirect";
+          }
+        }
+      }
+    }
+  }
+
+  return "Unknown";
+}
+
+function getFaintSource(data, playerIdentifier, pokemonId) {
+	const log = data.log;
+	const players = data.players;
+	const logLines = log.split('\n');
+  const pokemonToFind = getNickname(data, playerIdentifier, pokemonId);
+
+  const baseSpeciesName = pokemonToFind.split('-')[0];
+	const playerDetails = _getPlayerDetails(data, players, playerIdentifier);
+	if (!playerDetails) {
+		return "Player not found.";
+	}
+	const { playerTag, targetPlayerName } = playerDetails;
+	
+	const pokemonList = _getPokemonList(log, playerTag);
+	if (pokemonId < 1 || pokemonId > pokemonList.length) {
+		return "Pokémon not found for the specified ID.";
+	}
+
+	const targetPokemonNickname = getNickname(data, playerIdentifier, pokemonId);
+	if (targetPokemonNickname.includes("not found")) {
+		return "Pokémon not found for the specified ID.";
+	}
+
+	let faintIndex = -1;
+	// Find the exact faint line for the target Pokémon using a more robust search.
+	for (let i = 0; i < logLines.length; i++) {
+		const line = logLines[i];
+		if (line.startsWith(`|faint|${playerTag}`) && line.includes(targetPokemonNickname)) {
+			faintIndex = i;
+			break;
+		}
+	}
+
+  // Check for a forfeit condition.
+  // A forfeit happens if the player is the loser and the pokemon didn't actually faint in the log.
+  if (faintIndex === -1) {
+    const pokemonFainted = log.includes(`|faint|${playerTag}a: ${targetPokemonNickname}`);
+    const winnerName = getWinner(data);
+    if (winnerName !== "Winner not found.") {
+        const opponentName = (players[0] === targetPlayerName) ? players[1] : players[0];
+        if (winnerName === opponentName && getForfeit(data, playerTag) && !pokemonFainted) {
+            return getLoser(data);
+        }
+    }
+    		return "N/A";
+	}
+	
+	const faintLine = logLines[faintIndex];
+	const faintingPokemonName = faintLine.substring((`|faint|${playerTag}a: `).length).trim();
+	
+	const opponentPlayerTag = (playerTag === 'p1' ? 'p2' : 'p1');
+	const opponentNicknameMap = _getNicknameToSpeciesMap(log, opponentPlayerTag);
+
+  const targetPokemonFaintPrefix = `|faint|${playerDetails.playerTag}a: `;
+  const faintType = getFaintType(data, playerIdentifier, pokemonId);
+  if (faintType === "N/A" || faintType.includes("not found")) {
+      return "N/A";
+  }
+  if (faintType === "Direct") {
+    // Find the move that caused the faint on the previous line.
+    for (let i = faintIndex - 1; i >= 0; i--) {
+        const line = logLines[i];
+        // The move line must have the opponent's tag to be considered a direct faint.
+        if (line.startsWith('|move|') && line.includes(opponentPlayerTag)) {
+            const parts = line.split('|');
+            const sourceNickname = parts[2].split(': ')[1].trim();
+            return opponentNicknameMap[sourceNickname] || sourceNickname; // Return the species name
+        }
+    }
+  } else if (faintType === "Self") {
+    return "Self";
+  } else if (faintType === "Indirect") {
+    const result = _getFaintCauseAndSourceFromIndirectDamage(logLines, faintIndex, pokemonToFind, baseSpeciesName, opponentPlayerTag, opponentNicknameMap, playerDetails.playerTag); 
+    return result.source;
+  }
+  return "Unknown";
+}
+
+function getFaintMove(data, playerIdentifier, pokemonId) {
+	const log = data.log;
+	const players = data.players;
+	const logLines = log.split('\n');
+  const pokemonToFind = getNickname(data, playerIdentifier, pokemonId);
+	const playerDetails = _getPlayerDetails(data, players, playerIdentifier);
+  const baseSpeciesName = pokemonToFind.split('-')[0];
+	if (!playerDetails) {
+		return "Player not found.";
+	}
+	const { playerTag, targetPlayerName } = playerDetails;
+	
+	const pokemonList = _getPokemonList(log, playerTag);
+	if (pokemonId < 1 || pokemonId > pokemonList.length) {
+		return "Pokémon not found for the specified ID.";
+	}
+
+	const targetPokemonNickname = getNickname(data, playerIdentifier, pokemonId);
+	if (targetPokemonNickname.includes("not found")) {
+		return "Pokémon not found for the specified ID.";
+	}
+
+	let faintIndex = -1;
+	// Find the exact faint line for the target Pokémon using a more robust search.
+	for (let i = 0; i < logLines.length; i++) {
+		const line = logLines[i];
+		if (line.startsWith(`|faint|${playerTag}`) && line.includes(targetPokemonNickname)) {
+			faintIndex = i;
+			break;
+		}
+	}
+
+  // Check for a forfeit condition.
+  // A forfeit happens if the player is the loser and the pokemon didn't actually faint in the log.
+    if (faintIndex === -1) {
+      const pokemonFainted = log.includes(`|faint|${playerTag}a: ${targetPokemonNickname}`);
+    const winnerName = getWinner(data);
+    if (winnerName !== "Winner not found.") {
+        const opponentName = (players[0] === targetPlayerName) ? players[1] : players[0];
+        if (winnerName === opponentName && getForfeit(data, playerTag) && !pokemonFainted) {
+            return "Forfeit";
+        }
+    }
+    		return "N/A";
+	}
+	const faintLine = logLines[faintIndex];
+	const faintingPokemonName = faintLine.substring((`|faint|${playerTag}a: `).length).trim();
+	
+	const opponentPlayerTag = (playerTag === 'p1' ? 'p2' : 'p1');
+	const opponentNicknameMap = _getNicknameToSpeciesMap(log, opponentPlayerTag);
+
+  const targetPokemonFaintPrefix = `|faint|${playerDetails.playerTag}a: `;
+
+  const faintType = getFaintType(data, playerIdentifier, pokemonId);
+  if (faintType === "N/A" || faintType.includes("not found")) {
+      return "N/A";
+  }
+
+  if (faintType === "Direct") {
+    // Find the move that caused the faint on the previous line.
+    for (let i = faintIndex - 1; i >= 0; i--) {
+        const line = logLines[i];
+        if (line.startsWith('|move|')) {
+            const parts = line.split('|');
+            return parts[3].trim();
+        }
+    }
+  } else if (faintType === "Self") {
+    // Loop backwards from the faint to find the specific damage or move that caused it.
+    for (let i = faintIndex - 1; i >= 0; i--) {
+      const line = logLines[i];
+
+      // Check for self-KO moves first, as they might not have a damage line right before the faint.
+      const selfKO_moves = [
+        "Self-Destruct", "Explosion", "Final Gambit", "Memento", "Healing Wish", "Misty Explosion", "Lunar Dance"
+      ];
+      if (line.startsWith('|move|') && selfKO_moves.some(move => line.includes(move))) {
+          const parts = line.split('|');
+          const movedByPokemon = parts[2].split(': ')[1].trim();
+          if (movedByPokemon === pokemonToFind || movedByPokemon === baseSpeciesName) {
+              return parts[3].trim();
+          }
+      }
+
+      const targetPokemonFullTag = `${playerDetails.playerTag}a: ${pokemonToFind}`;
+
+      // Then check for damage lines that caused the faint for the target pokemon.
+      if (line.startsWith('|-damage|') && (line.includes(targetPokemonFullTag) || line.includes(`${playerDetails.playerTag}a: ${baseSpeciesName}`)) && line.includes('0 fnt')) {
+          if (line.includes('[from] confusion')) {
+              // Now we need to find the move that caused the confusion
+              for (let j = i - 1; j >= 0; j--) {
+                  const prevLine = logLines[j];
+                  if (prevLine.startsWith('|-start|') && prevLine.includes('confusion') && (prevLine.includes(pokemonToFind) || prevLine.includes(baseSpeciesName))) {
+                      for (let k = j - 1; k >= 0; k--) {
+                          const moveThatCausedStatus = logLines[k];
+                          if (moveThatCausedStatus.startsWith('|move|') && (moveThatCausedStatus.includes(pokemonToFind) || moveThatCausedStatus.includes(baseSpeciesName))) {
+                              const parts = moveThatCausedStatus.split('|');
+                              return `${parts[3].trim()} (Confusion)`;
+                          }
+                      }
+                  }
+              }
+              // If we can't find the move that caused confusion
+              return "Confusion Damage";
+          } else if (line.includes('[from] Recoil') || line.includes('[from] recoil')) {
+              // Find the last move made by the fainting pokemon
+              for (let j = i - 1; j >= 0; j--) {
+                  const prevLine = logLines[j];
+                  if (prevLine.startsWith('|move|') && (prevLine.includes(pokemonToFind) || prevLine.includes(baseSpeciesName))) {
+                      const parts = prevLine.split('|');
+                      return `${parts[3].trim()} (Recoil)`;
+                  }
+              }
+              return "Recoil";
+          } else if (line.includes('[from] item: Life Orb')) {
+              // Find the last move made by the fainting pokemon
+              for (let j = i - 1; j >= 0; j--) {
+                  const prevLine = logLines[j];
+                  if (prevLine.startsWith('|move|') && (prevLine.includes(pokemonToFind) || prevLine.includes(baseSpeciesName))) {
+                      const parts = prevLine.split('|');
+                      return `${parts[3].trim()} (Life Orb)`;
+                  }
+              }
+              return "Life Orb";
+          } else if (line.includes('[from] highjumpkick')) {
+              // Find the last move made by the fainting pokemon
+              for (let j = i - 1; j >= 0; j--) {
+                  const prevLine = logLines[j];
+                  if (prevLine.startsWith('|move|') && (prevLine.includes(pokemonToFind) || prevLine.includes(baseSpeciesName))) {
+                      const parts = prevLine.split('|');
+                      return `${parts[3].trim()} (Crash)`;
+                  }
+              }
+              return "Crash";
+          } else if (line.includes('[from] item: Sticky Barb')) {
+              return "Sticky Barb";
+          } else if (line.includes('[from] item: Black Sludge')) {
+              return "Black Sludge";
+          } else if (line.includes('[from] psn') || line.includes('[from] brn') || line.includes('[from] tox')) {
+              for (let j = i - 1; j >= 0; j--) {
+                  const prevLine = logLines[j];
+                  if (prevLine.startsWith('|-status|') && (prevLine.includes(pokemonToFind) || prevLine.includes(baseSpeciesName)) &&
+                      (prevLine.includes('item: Toxic Orb') || prevLine.includes('item: Flame Orb'))) {
+                      return prevLine.includes('Toxic Orb') ? "Toxic Orb" : "Flame Orb";
+                  }
+              }
+          }
+      }
+    }
+  } else if (faintType === "Indirect") {
+    const result = _getFaintCauseAndSourceFromIndirectDamage(logLines, faintIndex, pokemonToFind, baseSpeciesName, opponentPlayerTag, {}, playerDetails.playerTag); 
+    return result.move;
+  }
+  return "Unknown";
+}
+
+function getBattleSurvived(data, playerIdentifier, pokemonId) {
+  const battleWon = getBattleWon(data, playerIdentifier, pokemonId);
+  const faintType = getFaintType(data, playerIdentifier, pokemonId);
+
+  // If there was an error getting the battle result or faint type, pass the error message.
+  if (typeof battleWon === 'string') {
+    return battleWon;
+  }
+  if (typeof faintType === 'string' && faintType.includes("not found")) {
+      return faintType;
+  }
+
+  // A Pokémon survives if its team won AND it did not faint (faintType === "N/A").
+  if (battleWon === 1 && faintType === "N/A") {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+function getBattleFainted(data, playerIdentifier, pokemonId) {
+  const battleWon = getBattleWon(data, playerIdentifier, pokemonId);
+  const faintType = getFaintType(data, playerIdentifier, pokemonId);
+
+  // If there was an error getting the battle result or faint type, pass the error message.
+  if (typeof battleWon === 'string') {
+    return battleWon;
+  }
+  if (typeof faintType === 'string' && faintType.includes("not found")) {
+      return faintType;
+  }
+
+  // A Pokémon faints if its team lost OR if it fainted (faintType !== "N/A").
+  if (battleWon === 0 || faintType !== "N/A") {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+function getActiveTurns(data, playerIdentifier, pokemonId) {
+  const log = data.log;
+  const players = data.players;
+  const playerDetails = _getPlayerDetails(data, players, playerIdentifier);
+
+  if (!playerDetails) {
+    return "Error: Player not found.";
+  }
+
+  const { playerTag } = playerDetails;
+  
+  // Use existing functions to get the Pokemon's species and nickname
+  const targetPokemonSpecies = getPokemon(data, playerIdentifier, pokemonId);
+  const targetPokemonNickname = getNickname(data, playerIdentifier, pokemonId);
+  
+  if (typeof targetPokemonSpecies === 'string' && targetPokemonSpecies.includes("not found")) {
+      return "Error: Pokémon not found for the specified ID.";
+  }
+
+  let activeTurns = 0;
+  const logLines = log.split('\n');
+  let currentTurn = 0;
+  
+  // Use a Set to track which turns we've already counted an active move for
+  const turnsWithMoves = new Set();
+
+  logLines.forEach(line => {
+    // Update the current turn number
+    if (line.startsWith('|turn|')) {
+      currentTurn = parseInt(line.split('|')[2]);
+    }
+
+    // Check for a move line from the target player
+    if (line.startsWith(`|move|${playerTag}a:`)) {
+      const parts = line.split('|');
+      const pokemonNameInLog = parts[2].split(': ')[1].split('|[')[0].trim();
+      
+      // Check if the Pokemon making the move is our target, using either species or nickname
+      if ((pokemonNameInLog === targetPokemonSpecies || pokemonNameInLog === targetPokemonNickname) && !turnsWithMoves.has(currentTurn)) {
+        activeTurns++;
+        turnsWithMoves.add(currentTurn); // Mark this turn as counted
+      }
+    }
+  });
+
+  return activeTurns;
+}
+
+function getBattleKOs(data, playerIdentifier, pokemonId, koType) {
+  const log = data.log;
+  const players = data.players;
+  
+  const playerDetails = _getPlayerDetails(data, players, playerIdentifier);
+  if (!playerDetails) {
+    return "Error: Player not found.";
+  }
+  const { playerTag } = playerDetails;
+  
+  const targetPokemonSpecies = getPokemon(data, playerIdentifier, pokemonId);
+  if (typeof targetPokemonSpecies === 'string' && targetPokemonSpecies.includes("not found")) {
+      return "Error: Pokémon not found for the specified ID.";
+  }
+  const targetPokemonNickname = getNickname(data, playerIdentifier, pokemonId);
+  const logLines = log.split('\n');
+  let koCount = 0;
+
+    // The logic for Self KOs has been updated to check for two conditions:
+  // 1. A Pokémon on the same team faints and the faint source is the target Pokémon.
+  // 2. The target Pokémon itself faints and the faint source is "Self".
+  if (koType === "Self") {
+      const playerPokemonList = _getPokemonList(log, playerTag);
+      for (let i = 1; i <= playerPokemonList.length; i++) {
+          const teammateSpecies = getPokemon(data, playerIdentifier, i);
+          const faintSource = getFaintSource(data, playerIdentifier, i);
+          
+          // Case 1: A teammate faints and the faint source is the target Pokémon.
+          if (faintSource === targetPokemonSpecies) {
+              koCount++;
+          }
+          // Case 2: The target Pokémon itself faints and the faint source is "Self".
+          if (i === pokemonId && faintSource === "Self") {
+              koCount++;
+          }
+      }
+      return koCount;
+  }
+  
+  // Logic for Direct and Indirect KOs remains the same.
+  const opponentPlayerTag = (playerTag === 'p1' ? 'p2' : 'p1');
+  const opponentPokemonList = _getPokemonList(log, opponentPlayerTag);
+  
+  for (let i = 1; i <= opponentPokemonList.length; i++) {
+    const opponentPokemonSpecies = getPokemon(data, (opponentPlayerTag === 'p1' ? "1" : "2"), i);
+    const faintSource = getFaintSource(data, (opponentPlayerTag === 'p1' ? "1" : "2"), i);
+    const faintType = getFaintType(data, (opponentPlayerTag === 'p1' ? "1" : "2"), i);
+
+    // Check if the faint source is our target Pokémon and the KO type matches
+    if (faintSource === targetPokemonSpecies && faintType === koType) {
+        koCount++;
+    }
+  }
+
+  return koCount;
+}
+
+function getDamageTaken(data, playerIdentifier, pokemonId) {
+  const log = data.log;
+  const players = data.players;
+  const playerDetails = _getPlayerDetails(data, players, playerIdentifier);
+  if (!playerDetails) {
+    return "Player not found.";
+  }
+  const { playerTag } = playerDetails;
+
+  // Get the nickname for the target Pokémon to accurately track it in the log.
+  const targetPokemonNickname = getNickname(data, playerIdentifier, pokemonId);
+  if (targetPokemonNickname.includes("not found")) {
+    return targetPokemonNickname;
+  }
+
+  const logLines = log.split('\n');
+  let targetPokemonIdentifier = null;
+  let totalDamageTaken = 0;
+  let currentHp = null;
+
+  // First, find the exact identifier for the Pokémon (e.g., "p1a: Haxorus")
+  // and set the initial HP from the first time it switches into battle.
+  for (const line of logLines) {
+    if (line.startsWith('|switch|') && line.includes(targetPokemonNickname)) {
+      const parts = line.split('|');
+      // parts[2] will be the identifier, e.g. "p1a: Haxorus"
+      targetPokemonIdentifier = parts[2];
+      // parts[4] will be the HP string, e.g. "100/100"
+      currentHp = parseInt(parts[4].split('/')[0], 10);
+      break;
+    }
+  }
+
+  // If the Pokémon was never switched in, it took no damage.
+  if (targetPokemonIdentifier === null) {
+      return 0;
+  }
+
+  // Now, iterate through the log to track HP changes and calculate total damage.
+  for (const line of logLines) {
+    const parts = line.split('|');
+    const lineType = parts[1];
+
+    // Check if the line is a damage or heal event for our target Pokémon.
+    // The Pokémon identifier is at parts[2] for these events.
+    if (lineType === '-damage' || lineType === '-heal') {
+        if (parts[2] === targetPokemonIdentifier) {
+            const hpString = parts[3];
+            let newHp;
+            if (hpString.includes('fnt')) {
+              newHp = 0;
+            } else {
+              newHp = parseInt(hpString.split('/')[0], 10);
+            }
+            
+            // If it's a damage line, calculate and add to the total.
+            if (lineType === '-damage') {
+              const damageDealt = currentHp - newHp;
+              if (damageDealt > 0) {
+                totalDamageTaken += damageDealt;
+              }
+            }
+            
+            // Update the current HP for the next calculation.
+            currentHp = newHp;
+        }
+    } else if (line.startsWith('|switch|') && parts[2] === targetPokemonIdentifier) {
+        // Re-initialize HP when a pokemon switches back in, handling cases
+        // like baton pass or volt switch that show remaining HP.
+        const hpString = parts[4];
+        currentHp = parseInt(hpString.split('/')[0], 10);
+    }
+  }
+
+  return totalDamageTaken;
+}
+
+function getDamageHealed(data, playerIdentifier, pokemonId) {
+            const log = data.log;
+            const logLines = log.split('\n');
+            
+            const targetPokemonNickname = getNickname(data, playerIdentifier, pokemonId); 
+            if (targetPokemonNickname.includes("not found")) { return targetPokemonNickname; }
+
+            // Local variables ensure a clean state for every function call.
+            let totalDamageHealed = 0;
+            let currentHp = 0; 
+            let lastRecordedHpBeforeSwitch = 0;
+            let hasSwitchedIn = false; 
+
+            for (const line of logLines) {
+                const parts = line.split('|');
+
+                // Case 1: Target Pokémon switches in (or dragged in)
+                if ((line.startsWith('|switch|') || line.startsWith('|drag|')) && line.includes(targetPokemonNickname)) {
+                    if (parts.length > 4) {
+                        const hpString = parts[4];
+                        let newHp = parseInt(hpString.split('/')[0], 10);
+
+                        if (!hasSwitchedIn) {
+                            // First time switch-in: Set HP trackers. No healing possible yet.
+                            currentHp = newHp;
+                            lastRecordedHpBeforeSwitch = newHp; 
+                            hasSwitchedIn = true;
+                            console.log(`[Switch IN]: ${targetPokemonNickname} initialized. HP set to ${newHp}`);
+                        } else {
+                            // Subsequent switch-in (Regenerator/Natural Cure Check)
+                            if (newHp > lastRecordedHpBeforeSwitch) {
+                                const healedAmount = newHp - lastRecordedHpBeforeSwitch;
+                                totalDamageHealed += healedAmount;
+                                console.log(`[Switch Heal]: ${targetPokemonNickname} healed ${healedAmount}. Old HP: ${lastRecordedHpBeforeSwitch}, New HP: ${newHp}`);
+                            }
+                            // Update trackers for the new active state
+                            currentHp = newHp;
+                            lastRecordedHpBeforeSwitch = currentHp;
+                        }
+                    }
+                }
+
+                // --- Skip all in-battle tracking until the target Pokémon has appeared ---
+                if (!hasSwitchedIn) continue;
+
+                // Case 2: Standard damage or healing
+                // FIX: Check if parts[2] (the target of the action) contains the nickname.
+                // This prevents mistakenly counting the healing Hoopa gets from Drain Punch on Tyranitar.
+                const isDamageOrHeal = line.startsWith('|-damage|') || line.startsWith('|-heal|');
+                const isTargeted = parts[2] && parts[2].includes(targetPokemonNickname);
+
+                if (isDamageOrHeal && isTargeted) {
+                    if (parts.length > 3) {
+                        const hpString = parts[3];
+                        let newHp;
+
+                        if (hpString.includes('fnt')) {
+                            newHp = 0; // Pokémon faints, HP is 0
+                        } else {
+                            newHp = parseInt(hpString.split('/')[0], 10);
+                        }
+
+                        // Track healing from an explicit heal line
+                        if (line.startsWith('|-heal|')) {
+                            const healedAmount = newHp - currentHp;
+                            if (healedAmount > 0) { 
+                                totalDamageHealed += healedAmount;
+                                console.log(`[Heal Line]: ${targetPokemonNickname} healed ${healedAmount}. Current Total: ${totalDamageHealed}`);
+                            }
+                        }
+                        
+                        // Update trackers for the ongoing state. This handles the '0 fnt' case.
+                        currentHp = newHp;
+                        lastRecordedHpBeforeSwitch = currentHp;
+                    }
+                }
+                
+                // Case 3: Explicit Faint line (The final state setting)
+                // This is the failsafe to ensure 0 HP is recorded before the battle continues.
+                if (line.startsWith('|faint|') && line.includes(targetPokemonNickname)) {
+                    currentHp = 0;
+                    lastRecordedHpBeforeSwitch = 0;
+                    console.log(`[FAINT RESET]: ${targetPokemonNickname} fainted. lastRecordedHpBeforeSwitch is now explicitly set to 0.`);
+                }
+            }
+
+            return totalDamageHealed;
+        }
+
+function getDamageDealt(data, playerIdentifier, pokemonId, damageType) {
+  const log = data.log;
+  const players = data.players;
+  const playerDetails = _getPlayerDetails(data, players, playerIdentifier);
+  if (!playerDetails) {
+    return "Player not found.";
+  }
+  const { playerTag } = playerDetails;
+  const opponentPlayerTag = (playerTag === 'p1' ? 'p2' : 'p1');
+
+  const targetPokemonNickname = getNickname(data, playerIdentifier, pokemonId);
+  if (targetPokemonNickname.includes("not found")) {
+    return targetPokemonNickname;
+  }
+  
+  const logLines = log.split('\n');
+  let totalDirectDamage = 0;
+  let totalIndirectDamage = 0;
+  let totalHazardDamage = 0;
+
+  // A map to track who applied what passive effect, including who is active on the field
+  const passiveSources = new Map();
+  let activePlayerPokemonNickname = null;
+
+  // An array to keep a short history of moves for easy lookup
+  const moveHistory = [];
+
+  // Get opponent's team to initialize their HP trackers
+  const opponentTeam = _getPokemonList(log, opponentPlayerTag);
+  const opponentPokemonHp = new Map();
+  for (const species of opponentTeam) {
+    opponentPokemonHp.set(species, 100);
+  }
+
+  for (let i = 0; i < logLines.length; i++) {
+    const line = logLines[i];
+    const parts = line.split('|');
+
+    // Update the active player's Pokémon
+    if (line.startsWith(`|switch|${playerTag}`) || line.startsWith(`|drag|${playerTag}`)) {
+      activePlayerPokemonNickname = parts[2].split(': ')[1].trim();
+    }
+    
+    // Track all moves and their attackers for attribution. The distinction between
+    // direct and indirect damage will be made in the damage processing section.
+    if (line.startsWith('|move|') && line.includes(`|${playerTag}`)) {
+      const attackerNickname = parts[2].split(': ')[1].trim();
+      const moveName = parts[3].trim();
+      moveHistory.push({ attacker: attackerNickname, move: moveName });
+      // Keep history short to only look at the most recent moves
+      if (moveHistory.length > 5) {
+        moveHistory.shift();
+      }
+    }
+    
+    // New logic to track the source of Leech Seed
+    if (line.startsWith('|-start|') && line.includes('move: Leech Seed') && line.includes(opponentPlayerTag)) {
+      if (moveHistory.length > 0) {
+        const attackerNickname = moveHistory[moveHistory.length - 1].attacker;
+        passiveSources.set("Leech Seed", attackerNickname);
+      }
+    }
+    
+    // New logic to track the source of other status conditions
+    if (line.startsWith('|-status|') && line.includes(opponentPlayerTag)) {
+      const statusTarget = parts[2].split(': ')[1].trim();
+      const statusId = parts[3].trim();
+      const fromSource = parts[4] ? parts[4].trim() : null;
+
+      if (fromSource === '[from] toxic spikes') {
+        // Special case: Toxic Spikes damage is attributed to the Pokémon that laid the spikes.
+        const toxicSpikesSource = passiveSources.get('Toxic Spikes');
+        if (toxicSpikesSource) {
+          passiveSources.set(statusTarget + '-' + statusId, toxicSpikesSource);
+        }
+      } else {
+        // Regular status moves (e.g., Toxic, Will-O-Wisp).
+        if (moveHistory.length > 0) {
+          const attackerNickname = moveHistory[moveHistory.length - 1].attacker;
+          if (attackerNickname) {
+            passiveSources.set(statusTarget + '-' + statusId, attackerNickname);
+          }
+        }
+      }
+    }
+
+    // Track entry hazards set on the opponent's side, which are caused by our player.
+    if (line.startsWith('|-sidestart|') && line.includes(opponentPlayerTag)) {
+      const moveNameRaw = parts[3];
+      let moveName;
+      if (moveNameRaw.includes(':')) {
+        moveName = moveNameRaw.split(':')[1].trim();
+      } else {
+        moveName = moveNameRaw.trim();
+      }
+      if (moveHistory.length > 0) {
+        const attackerNickname = moveHistory[moveHistory.length - 1].attacker;
+        if (moveName === "Stealth Rock" || moveName === "Spikes" || moveName === "Toxic Spikes") {
+          passiveSources.set(moveName, attackerNickname);
+        }
+      }
+    }
+
+    // Process damage events
+    if (line.startsWith('|-damage|') && parts[2].startsWith(opponentPlayerTag)) {
+      const damageTargetNickname = parts[2].split(': ')[1].trim();
+      const hpString = parts[3];
+
+      let newHp;
+      if (hpString.includes('fnt')) {
+        newHp = 0;
+      } else {
+        newHp = parseInt(hpString.split('/')[0], 10);
+      }
+
+      // Find the species name from the nickname
+      const damageTargetSpecies = _getNicknameToSpeciesMap(log, opponentPlayerTag)[damageTargetNickname];
+      const oldHp = opponentPokemonHp.get(damageTargetSpecies) || 100;
+      const damage = oldHp - newHp;
+      
+      // Update the current HP
+      opponentPokemonHp.set(damageTargetSpecies, newHp);
+      
+      if (damage > 0) {
+        // Case 1: Damage from an indirect source. This is now determined by the presence of a '[from]' tag.
+        if (line.includes('[from]')) {
+          const fromSource = parts[4].trim();
+          // Check for both 'psn' and 'tox' as damage sources
+          const statusId = fromSource.substring(8);
+          
+          let source = null;
+          if (fromSource === '[from] Leech Seed') {
+            source = passiveSources.get("Leech Seed");
+          } else if (fromSource === '[from] brn' || fromSource === '[from] psn') {
+            // Check for both 'psn' and 'tox' keys in passiveSources
+            source = passiveSources.get(damageTargetNickname + '-' + 'tox') || passiveSources.get(damageTargetNickname + '-' + 'psn');
+          } else if (fromSource === '[from] Stealth Rock') {
+            source = passiveSources.get("Stealth Rock");
+            if (source === targetPokemonNickname) {
+              totalHazardDamage += damage;
+            }
+          } else if (fromSource === '[from] Spikes') {
+            source = passiveSources.get("Spikes");
+            if (source === targetPokemonNickname) {
+              totalHazardDamage += damage;
+            }
+          } else if (fromSource === '[from] item: Rocky Helmet' || fromSource === '[from] ability: Rough Skin' || fromSource === '[from] ability: Iron Barbs') {
+            source = activePlayerPokemonNickname;
+          }
+          
+          if (source === targetPokemonNickname) {
+            totalIndirectDamage += damage;
+          }
+        }
+        
+        // Case 2: Damage from a direct move.
+        else {
+          const lastMove = moveHistory[moveHistory.length - 1];
+          if (lastMove && lastMove.attacker === targetPokemonNickname) {
+            totalDirectDamage += damage;
+          }
+        }
+      }
+    }
+  }
+
+  // Return based on the requested damage type
+  const type = damageType ? damageType.toLowerCase() : 'total';
+  if (type === 'direct') {
+    return totalDirectDamage;
+  } else if (type === 'indirect') {
+    return totalIndirectDamage;
+  } else if (type === 'hazard') {
+    return totalHazardDamage;
+  } else {
+    return totalDirectDamage + totalIndirectDamage;
+  }
+}
+
+function getHitsTaken(data, playerIdentifier, pokemonId) {
+
+  const log = data.log;
+  const players = data.players;
+  const playerDetails = _getPlayerDetails(data, players, playerIdentifier);
+  if (!playerDetails) {
+    return "Player not found.";
+  }
+  const { playerTag } = playerDetails;
+
+  // Get the nickname for the target Pokémon to accurately track it in the log.
+  const targetPokemonNickname = getNickname(data, playerIdentifier, pokemonId);
+  if (targetPokemonNickname.includes("not found")) {
+    return targetPokemonNickname;
+  }
+
+  const logLines = log.split('\n');
+  let targetPokemonIdentifier = null;
+  let hitsTaken = 0;
+
+  // First, find the exact identifier for the Pokémon (e.g., "p1a: Haxorus")
+  for (const line of logLines) {
+    if (line.startsWith('|switch|') && line.includes(targetPokemonNickname)) {
+      const parts = line.split('|');
+      targetPokemonIdentifier = parts[2];
+      break;
+    }
+  }
+
+  // If the Pokémon was never switched in, it took no hits.
+  if (targetPokemonIdentifier === null) {
+    return 0;
+  }
+
+  // Now, iterate through the log to count direct hits.
+  for (const line of logLines) {
+    const parts = line.split('|');
+    const lineType = parts[1];
+
+    // Check for damage events on our target Pokémon.
+    if (lineType === '-damage' && parts[2] === targetPokemonIdentifier) {
+      // Direct damage lines do not have a "[from]" tag.
+      // We check if the fourth part of the line contains "[from]".
+      const fromTagExists = parts.length > 4 && parts[4].includes('[from]');
+
+      if (!fromTagExists) {
+        // This is a direct hit from a move.
+        hitsTaken++;
+      }
+    }
+  }
+
+  return hitsTaken;
+}
+
+        // --- UI Logic and Integration ---
+        
+        const replayTableBody = document.getElementById('replayTableBody');
+        const replayUrlInput = document.getElementById('replayUrl');
+        const processButton = document.getElementById('processButton');
+        const copyButton = document.getElementById('copyButton');
+        const tableContainer = document.getElementById('table-container');
+        const messageBox = document.getElementById('message-box');
+        const buttonText = document.getElementById('buttonText');
+        const buttonSpinner = document.getElementById('buttonSpinner');
+        
+        /**
+         * Displays a temporary message in the message box.
+         */
+        function showMessage(message, type) {
+            const baseClasses = "p-3 mb-4 rounded-lg text-sm transition-opacity duration-300";
+            let colorClasses;
+            
+            if (type === 'error') colorClasses = "bg-red-100 text-red-700 border border-red-400";
+            else if (type === 'success') colorClasses = "bg-green-100 text-green-700 border border-green-400";
+            else colorClasses = "bg-blue-100 text-blue-700 border border-blue-400";
+
+            messageBox.className = baseClasses + " " + colorClasses;
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden');
+
+            setTimeout(() => {
+                messageBox.classList.add('opacity-0');
+                setTimeout(() => {
+                    messageBox.classList.add('hidden');
+                    messageBox.classList.remove('opacity-0');
+                }, 300);
+            }, 5000);
+        }
+
+        /**
+         * Toggles the loading state of the button.
+         */
+        function setLoadingState(isLoading) {
+            processButton.disabled = isLoading;
+            copyButton.disabled = isLoading;
+            if (isLoading) {
+                buttonText.textContent = 'Processing...';
+                buttonSpinner.classList.remove('hidden');
+            } else {
+                buttonText.textContent = 'Process Replay';
+                buttonSpinner.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Populates a single row with all data, including the 12 Pokémon, their nicknames, faint type, and faint source.
+         */
+        function addRowToTable(url, data) {
+            replayTableBody.innerHTML = '';
+            tableContainer.classList.remove('hidden');
+
+            const winnerName = PLAYER_NAME_MAP[getWinner(data).replace(/\s/g, '').toLowerCase()];
+            const loserName = PLAYER_NAME_MAP[getLoser(data).replace(/\s/g, '').toLowerCase()];
+			const turnCount = getTurns(data);
+
+            const row = document.createElement('tr');
+            
+            const urlParts = url.split('/');
+            const replayId = urlParts[urlParts.length - 1].replace('.json', '');
+
+            let html = `
+                <!-- 1. Replay ID (excluded from copy) -->
+                <td class="sticky left-0 bg-white">
+                    <a href="${url}" target="_blank" class="text-blue-600 hover:underline">${replayId}</a>
+                </td>
+                <!-- 2. Winner -->
+                <td>${winnerName}</td>
+                <!-- 3. Loser -->
+                <td>${loserName}</td>
+                <!--4. Turns -->
+                <td>${turnCount}</td>
+				`;				
+            const identifiers = ['Winner', 'Loser'];
+            for (const identifier of identifiers) {
+                for (let i = 1; i <= 6; i++) {
+                    const pokemonName = getPokemon(data, identifier, i);
+                    const nickname = getNickname(data, identifier, i); 
+                    const faintType = getFaintType(data, identifier, i);
+                    const faintSource = getFaintSource(data, identifier, i);
+                    const faintMove = getFaintMove(data, identifier, i); 
+					
+					// --- NEW KO Counts ---
+                    const dKoCount = getBattleKOs(data, identifier, i, "Direct");
+                    const iKoCount = getBattleKOs(data, identifier, i, "Indirect");
+                    const sKoCount = getBattleKOs(data, identifier, i, "Self");
+					
+					// --- Damage Dealt ---
+					const tDamage = getDamageDealt (data,identifier,i, "Total");
+					const dDamage = getDamageDealt (data, identifier, i, "Direct");
+					const iDamage = getDamageDealt (data, identifier, i, "Indirect");
+					const hDamage = getDamageDealt (data, identifier, i, "Hazard");
+					
+					const hTaken = getHitsTaken(data, identifier, i);
+					const dTaken = getDamageTaken(data, identifier, i);
+					const dHealed = getDamageHealed(data, identifier, i);
+					
+					const aTurns = getActiveTurns(data, identifier, i);
+					const survived = getBattleSurvived(data, identifier, i);
+					const fainted = getBattleFainted(data, identifier, i);
+					const bWon = getBattleWon(data, identifier, i);
+					
+					
+                    // Species Column
+                    html += `<td class="pokemon-cell">${pokemonName}</td>`;
+                    // Nickname Column
+                    html += `<td class="nickname-cell">${nickname}</td>`; 
+					// Faint Type Column
+                    html += `<td class="faint-cell">${faintType}</td>`; 
+                    // Faint Source Column
+                    html += `<td class="source-cell">${faintSource}</td>`;
+                    // Faint Move Column
+                    html += `<td class="move-cell">${faintMove}</td>`;
+					// DKO Column
+                    html += `<td class="ko-cell">${dKoCount}</td>`; 
+                    // IKO Column
+                    html += `<td class="ko-cell">${iKoCount}</td>`; 
+                    // SKO Column
+                    html += `<td class="ko-cell">${sKoCount}</td>`;
+					// Tdamage Column
+                    html += `<td class="damage-cell">${tDamage}</td>`;
+					// Ddamage Column
+                    html += `<td class="damage-cell">${dDamage}</td>`;
+					// Idamage Column
+                    html += `<td class="damage-cell">${iDamage}</td>`;
+					// Hdamage Column
+                    html += `<td class="damage-cell">${hDamage}</td>`;
+					// HTaken Column
+                    html += `<td class="damage-cell">${hTaken}</td>`;
+					// DTaken Column
+                    html += `<td class="damage-cell">${dTaken}</td>`;
+					// DTaken Column
+                    html += `<td class="damage-cell">${dHealed}</td>`;
+					// aTurns Column
+                    html += `<td class="damage-cell">${aTurns}</td>`;
+					// survived Column
+                    html += `<td class="damage-cell">${survived}</td>`;
+					// fainted Column
+                    html += `<td class="damage-cell">${fainted}</td>`;
+					// Battle Won Column
+                    html += `<td class="damage-cell">${bWon}</td>`;
+
+                }
+            }
+
+            row.innerHTML = html;
+            replayTableBody.appendChild(row);
+        }
+        
+        /**
+         * Copies the table data (excluding Replay ID and Headers) to the clipboard.
+         */
+        function copyTableData() {
+            const rows = replayTableBody.querySelectorAll('tr');
+            let dataToCopy = [];
+
+            if (rows.length === 0) {
+                showMessage("No data to copy. Please process a replay first.", 'info');
+                return;
+            }
+
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                let rowData = [];
+
+                // Start at index 1 to skip the first cell (Replay ID)
+                for (let i = 1; i < cells.length; i++) {
+                    rowData.push(cells[i].textContent.trim());
+                }
+                
+                // Join columns with a tab character (\t) for Google Sheets
+                dataToCopy.push(rowData.join('\t')); 
+            });
+
+            const finalData = dataToCopy.join('\n');
+            
+            const tempInput = document.createElement('textarea');
+            tempInput.value = finalData;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showMessage("All data (including faint details) copied to clipboard! Ready to paste into a spreadsheet.", 'success');
+                } else {
+                    showMessage("Failed to copy data. Try manually selecting the text.", 'error');
+                }
+            } catch (err) {
+                showMessage("Error: Clipboard access denied. Try manually selecting the text.", 'error');
+            } finally {
+                document.body.removeChild(tempInput);
+            }
+        }
+
+
+async function handleProcessReplay() {
+    setLoadingState(true);
+    const url = replayUrlInput.value.trim();
+
+    if (!url) {
+        showMessage("Please enter a Pokémon Showdown Replay URL.", 'error');
+        setLoadingState(false);
+        return;
+    }
+    
+    let data; // Declare data outside the try block
+
+    try {
+        // --- This is the key change: call the new function ---
+        data = await getJsonData(url); 
+        // ----------------------------------------------------
+
+        // If the fetch and parsing succeed, process the data
+        addRowToTable(url, data);
+        showMessage("Replay data successfully processed and all details extracted.", 'success');
+        
+    } catch (e) {
+        // This catches network errors or the HTTP error thrown by getJsonData
+        console.error("Fetching or Processing error:", e);
+        // The error message from getJsonData is used directly
+        showMessage(`Error: ${e.message}`, 'error'); 
+        
+    } finally {
+        setLoadingState(false);
+    }
+}
+
+        processButton.addEventListener('click', handleProcessReplay);
+        copyButton.addEventListener('click', copyTableData);
+
+        // Run on load with a default URL for demonstration
+        window.onload = () => {
+             handleProcessReplay();
+        };
+
+    </script>
+</body>
+</html>
