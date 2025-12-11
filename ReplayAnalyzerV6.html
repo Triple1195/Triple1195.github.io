@@ -106,9 +106,10 @@
         <div id="message-box" class="hidden p-3 mb-4 rounded-lg text-sm" role="alert"></div>
 
         <div class="flex flex-col md:flex-row gap-4 mb-8">
-            <input type="url" id="replayUrl" placeholder="Paste Pokémon Showdown Replay URL (e.g., https://replay.pokemonshowdown.com/...)"
-                   class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                   value="">
+            <textarea id="replayUrls" placeholder="Paste Pokémon Showdown Replay URLs (one per line, e.g., https://replay.pokemonshowdown.com/...)"
+			rows="5"
+			class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm resize-y"
+			></textarea>
             
             <button id="processButton" class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-150 ease-in-out shadow-md flex items-center justify-center">
                 <span id="buttonText">Process Replay</span>
@@ -156,7 +157,7 @@
         // --- HARDCODED PLAYER NAME MAP ---
         const PLAYER_NAME_MAP = {
             '4reo': 'Aaron', 'poppynoodle': 'Adam', 'bafrednn': 'Bannon',
-            'superyoshibros': 'Brian', 'oshasafetyguy': 'Chris', 'drfrappuccino': 'Cory',
+            'superyoshibros': 'Brian', 'oshasafetyguy': 'Chris', 'dr.frappuccino': 'Cory',
             'shlowbro': 'Dante', 'gooigi88': 'David', 'obseen': 'Ernest',
             'fletchington': 'Fletchington', 'frank456758': 'Frank', 'mfsusan': 'Hall',
             'hclint44': 'Hank', 'theladylike': 'Izzy', 'devoidlazarus': 'Jordan',
@@ -528,7 +529,7 @@ function _getFaintCauseAndSourceFromIndirectDamage(logLines, faintIndex, faintin
 function getForfeit(data, playerTag) {
     // Extracts the log and player names from the parsed JSON.
     const log = data.log;
-    const players = json.players;
+    const players = data.players;
 
     // Determines the player's index based on their tag ('p1' is index 0, 'p2' is index 1).
     const playerIdentifier = (playerTag === 'p1' ? 0 : 1);
@@ -542,7 +543,7 @@ function getForfeit(data, playerTag) {
 
     // Checks if the log string contains the constructed forfeit message.
     if (log.includes(forfeitMessage)) {
-      Logger.log(`Player ${playerName} (${playerTag}) forfeited.`);
+     console.log(`Player ${playerName} (${playerTag}) forfeited.`);
       return true;
     }
     // Constructs the specific message that indicates inactivity.
@@ -551,11 +552,11 @@ function getForfeit(data, playerTag) {
 
     // Checks if the log string contains the constructed forfeit message.
     if (log.includes(inactiveMessage)) {
-      Logger.log(`Player ${playerName} (${playerTag}) lost due to inactivity.`);
+      console.log(`Player ${playerName} (${playerTag}) lost due to inactivity.`);
       return true;
     }
     // If the message is not found, the player did not forfeit.
-    Logger.log(`Player ${playerName} (${playerTag}) did not forfeit.`);
+    console.log(`Player ${playerName} (${playerTag}) did not forfeit.`);
     return false;
 
 }
@@ -1608,14 +1609,14 @@ function getHitsTaken(data, playerIdentifier, pokemonId) {
 
         // --- UI Logic and Integration ---
         
-        const replayTableBody = document.getElementById('replayTableBody');
-        const replayUrlInput = document.getElementById('replayUrl');
         const processButton = document.getElementById('processButton');
         const copyButton = document.getElementById('copyButton');
-        const tableContainer = document.getElementById('table-container');
         const messageBox = document.getElementById('message-box');
         const buttonText = document.getElementById('buttonText');
         const buttonSpinner = document.getElementById('buttonSpinner');
+		const replayUrlsInput = document.getElementById('replayUrls');
+		const replayTableBody = document.getElementById('replayTableBody');
+		const tableContainer = document.getElementById('table-container');
         
         /**
          * Displays a temporary message in the message box.
@@ -1656,109 +1657,107 @@ function getHitsTaken(data, playerIdentifier, pokemonId) {
             }
         }
 
-        /**
-         * Populates a single row with all data, including the 12 Pokémon, their nicknames, faint type, and faint source.
-         */
-        function addRowToTable(url, data) {
-            replayTableBody.innerHTML = '';
-            tableContainer.classList.remove('hidden');
+        // Get the new textarea element
 
-            const winnerName = PLAYER_NAME_MAP[getWinner(data).replace(/\s/g, '').toLowerCase()];
-            const loserName = PLAYER_NAME_MAP[getLoser(data).replace(/\s/g, '').toLowerCase()];
-			const turnCount = getTurns(data);
+/**
+ * Populates a single row with all data, including the 12 Pokémon, their nicknames, faint type, and faint source.
+ */
+function addRowToTable(url, data) {
+    // *** REMOVED: replayTableBody.innerHTML = ''; *** (This is the key change to allow multiple rows)
+    tableContainer.classList.remove('hidden');
 
-            const row = document.createElement('tr');
-            
-            const urlParts = url.split('/');
-            const replayId = urlParts[urlParts.length - 1].replace('.json', '');
+    const winnerName = PLAYER_NAME_MAP[getWinner(data).replace(/\s/g, '').toLowerCase()];
+    const loserName = PLAYER_NAME_MAP[getLoser(data).replace(/\s/g, '').toLowerCase()];
+    const turnCount = getTurns(data);
 
-            let html = `
-                <!-- 1. Replay ID (excluded from copy) -->
-                <td class="sticky left-0 bg-white">
-                    <a href="${url}" target="_blank" class="text-blue-600 hover:underline">${replayId}</a>
-                </td>
-                <!-- 2. Winner -->
-                <td>${winnerName}</td>
-                <!-- 3. Loser -->
-                <td>${loserName}</td>
-                <!--4. Turns -->
-                <td>${turnCount}</td>
-				`;				
-            const identifiers = ['Winner', 'Loser'];
-            for (const identifier of identifiers) {
-                for (let i = 1; i <= 6; i++) {
-                    const pokemonName = getPokemon(data, identifier, i);
-                    const nickname = getNickname(data, identifier, i); 
-                    const faintType = getFaintType(data, identifier, i);
-                    const faintSource = getFaintSource(data, identifier, i);
-                    const faintMove = getFaintMove(data, identifier, i); 
-					
-					// --- NEW KO Counts ---
-                    const dKoCount = getBattleKOs(data, identifier, i, "Direct");
-                    const iKoCount = getBattleKOs(data, identifier, i, "Indirect");
-                    const sKoCount = getBattleKOs(data, identifier, i, "Self");
-					
-					// --- Damage Dealt ---
-					const tDamage = getDamageDealt (data,identifier,i, "Total");
-					const dDamage = getDamageDealt (data, identifier, i, "Direct");
-					const iDamage = getDamageDealt (data, identifier, i, "Indirect");
-					const hDamage = getDamageDealt (data, identifier, i, "Hazard");
-					
-					const hTaken = getHitsTaken(data, identifier, i);
-					const dTaken = getDamageTaken(data, identifier, i);
-					const dHealed = getDamageHealed(data, identifier, i);
-					
-					const aTurns = getActiveTurns(data, identifier, i);
-					const survived = getBattleSurvived(data, identifier, i);
-					const fainted = getBattleFainted(data, identifier, i);
-					const bWon = getBattleWon(data, identifier, i);
-					
-					
-                    // Species Column
-                    html += `<td class="pokemon-cell">${pokemonName}</td>`;
-                    // Nickname Column
-                    html += `<td class="nickname-cell">${nickname}</td>`; 
-					// Faint Type Column
-                    html += `<td class="faint-cell">${faintType}</td>`; 
-                    // Faint Source Column
-                    html += `<td class="source-cell">${faintSource}</td>`;
-                    // Faint Move Column
-                    html += `<td class="move-cell">${faintMove}</td>`;
-					// DKO Column
-                    html += `<td class="ko-cell">${dKoCount}</td>`; 
-                    // IKO Column
-                    html += `<td class="ko-cell">${iKoCount}</td>`; 
-                    // SKO Column
-                    html += `<td class="ko-cell">${sKoCount}</td>`;
-					// Tdamage Column
-                    html += `<td class="damage-cell">${tDamage}</td>`;
-					// Ddamage Column
-                    html += `<td class="damage-cell">${dDamage}</td>`;
-					// Idamage Column
-                    html += `<td class="damage-cell">${iDamage}</td>`;
-					// Hdamage Column
-                    html += `<td class="damage-cell">${hDamage}</td>`;
-					// HTaken Column
-                    html += `<td class="damage-cell">${hTaken}</td>`;
-					// DTaken Column
-                    html += `<td class="damage-cell">${dTaken}</td>`;
-					// DTaken Column
-                    html += `<td class="damage-cell">${dHealed}</td>`;
-					// aTurns Column
-                    html += `<td class="damage-cell">${aTurns}</td>`;
-					// survived Column
-                    html += `<td class="damage-cell">${survived}</td>`;
-					// fainted Column
-                    html += `<td class="damage-cell">${fainted}</td>`;
-					// Battle Won Column
-                    html += `<td class="damage-cell">${bWon}</td>`;
+    const row = document.createElement('tr');
 
-                }
-            }
+    const urlParts = url.split('/');
+    const replayId = urlParts[urlParts.length - 1].replace('.json', '');
 
-            row.innerHTML = html;
-            replayTableBody.appendChild(row);
+    let html = `
+        <td class="sticky left-0 bg-white">
+            <a href="${url}" target="_blank" class="text-blue-600 hover:underline">${replayId}</a>
+        </td>
+        <td>${winnerName}</td>
+        <td>${loserName}</td>
+        <td>${turnCount}</td>
+        `;
+    const identifiers = ['Winner', 'Loser'];
+    for (const identifier of identifiers) {
+        for (let i = 1; i <= 6; i++) {
+            const pokemonName = getPokemon(data, identifier, i);
+            const nickname = getNickname(data, identifier, i);
+            const faintType = getFaintType(data, identifier, i);
+            const faintSource = getFaintSource(data, identifier, i);
+            const faintMove = getFaintMove(data, identifier, i);
+
+            // --- NEW KO Counts ---
+            const dKoCount = getBattleKOs(data, identifier, i, "Direct");
+            const iKoCount = getBattleKOs(data, identifier, i, "Indirect");
+            const sKoCount = getBattleKOs(data, identifier, i, "Self");
+
+            // --- Damage Dealt ---
+            const tDamage = getDamageDealt (data,identifier,i, "Total");
+            const dDamage = getDamageDealt (data, identifier, i, "Direct");
+            const iDamage = getDamageDealt (data, identifier, i, "Indirect");
+            const hDamage = getDamageDealt (data, identifier, i, "Hazard");
+
+            const hTaken = getHitsTaken(data, identifier, i);
+            const dTaken = getDamageTaken(data, identifier, i);
+            const dHealed = getDamageHealed(data, identifier, i);
+
+            const aTurns = getActiveTurns(data, identifier, i);
+            const survived = getBattleSurvived(data, identifier, i);
+            const fainted = getBattleFainted(data, identifier, i);
+            const bWon = getBattleWon(data, identifier, i);
+
+
+            // Species Column
+            html += `<td class="pokemon-cell">${pokemonName}</td>`;
+            // Nickname Column
+            html += `<td class="nickname-cell">${nickname}</td>`;
+            // Faint Type Column
+            html += `<td class="faint-cell">${faintType}</td>`;
+            // Faint Source Column
+            html += `<td class="source-cell">${faintSource}</td>`;
+            // Faint Move Column
+            html += `<td class="move-cell">${faintMove}</td>`;
+            // DKO Column
+            html += `<td class="ko-cell">${dKoCount}</td>`;
+            // IKO Column
+            html += `<td class="ko-cell">${iKoCount}</td>`;
+            // SKO Column
+            html += `<td class="ko-cell">${sKoCount}</td>`;
+            // Tdamage Column
+            html += `<td class="damage-cell">${tDamage}</td>`;
+            // Ddamage Column
+            html += `<td class="damage-cell">${dDamage}</td>`;
+            // Idamage Column
+            html += `<td class="damage-cell">${iDamage}</td>`;
+            // Hdamage Column
+            html += `<td class="damage-cell">${hDamage}</td>`;
+            // HTaken Column
+            html += `<td class="damage-cell">${hTaken}</td>`;
+            // DTaken Column
+            html += `<td class="damage-cell">${dTaken}</td>`;
+            // DHealed Column
+            html += `<td class="damage-cell">${dHealed}</td>`;
+            // aTurns Column
+            html += `<td class="damage-cell">${aTurns}</td>`;
+            // survived Column
+            html += `<td class="damage-cell">${survived}</td>`;
+            // fainted Column
+            html += `<td class="damage-cell">${fainted}</td>`;
+            // Battle Won Column
+            html += `<td class="damage-cell">${bWon}</td>`;
+
         }
+    }
+
+    row.innerHTML = html;
+    replayTableBody.appendChild(row);
+}
         
         /**
          * Copies the table data (excluding Replay ID and Headers) to the clipboard.
@@ -1806,46 +1805,58 @@ function getHitsTaken(data, playerIdentifier, pokemonId) {
             }
         }
 
-
 async function handleProcessReplay() {
     setLoadingState(true);
-    const url = replayUrlInput.value.trim();
+    // 1. Get all URLs from the textarea, split by new line, filter out empty/whitespace lines
+    const allUrls = replayUrlsInput.value.split('\n')
+        .map(url => url.trim())
+        .filter(url => url !== '');
 
-    if (!url) {
-        showMessage("Please enter a Pokémon Showdown Replay URL.", 'error');
+    if (allUrls.length === 0) {
+        showMessage("Please enter one or more Pokémon Showdown Replay URLs.", 'error');
         setLoadingState(false);
         return;
     }
+
+    // 2. Clear the table before processing the new batch of replays
+    replayTableBody.innerHTML = '';
     
-    let data; // Declare data outside the try block
+    let processedCount = 0;
+    let errorCount = 0;
 
-    try {
-        // --- This is the key change: call the new function ---
-        data = await getJsonData(url); 
-        // ----------------------------------------------------
+    // 3. Loop through each URL and process it
+    for (const url of allUrls) {
+        let data;
 
-        // If the fetch and parsing succeed, process the data
-        addRowToTable(url, data);
-        showMessage("Replay data successfully processed and all details extracted.", 'success');
-        
-    } catch (e) {
-        // This catches network errors or the HTTP error thrown by getJsonData
-        console.error("Fetching or Processing error:", e);
-        // The error message from getJsonData is used directly
-        showMessage(`Error: ${e.message}`, 'error'); 
-        
-    } finally {
-        setLoadingState(false);
+        try {
+            // Wait for the JSON data fetch
+            data = await getJsonData(url);
+
+            // Process the data and add a new row
+            addRowToTable(url, data);
+            processedCount++;
+
+        } catch (e) {
+            // This catches network errors or the HTTP error thrown by getJsonData
+            console.error(`Error processing URL ${url}:`, e);
+            errorCount++;
+        }
     }
-}
+    
+    // 4. Show a final message based on the results
+    if (processedCount > 0 && errorCount === 0) {
+         showMessage(`Successfully processed ${processedCount} replay(s). All details extracted.`, 'success');
+    } else if (processedCount > 0 && errorCount > 0) {
+         showMessage(`Processed ${processedCount} replay(s) with ${errorCount} error(s). See console for details.`, 'warning');
+    } else {
+         showMessage(`Failed to process any replays. ${errorCount} error(s) encountered.`, 'error');
+    }
 
+    setLoadingState(false);
+}
         processButton.addEventListener('click', handleProcessReplay);
         copyButton.addEventListener('click', copyTableData);
 
-        // Run on load with a default URL for demonstration
-        window.onload = () => {
-             handleProcessReplay();
-        };
 
     </script>
 </body>
