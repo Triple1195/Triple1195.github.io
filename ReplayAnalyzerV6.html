@@ -180,7 +180,7 @@
 async function getJsonData(u) {
     // FIX: Prepend a CORS proxy URL to bypass the 'Failed to fetch' cross-origin error.
 	const url = u + ".json";
-    const proxyUrl = '[https://corsproxy.io/?url=';
+    const proxyUrl = 'https://api.allorigins.win/get?url=';
     const finalUrl = proxyUrl + encodeURIComponent(url);
     
     console.log("Fetching URL via proxy:", finalUrl);
