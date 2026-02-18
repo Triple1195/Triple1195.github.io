@@ -163,7 +163,7 @@
             'hclint44': 'Hank', 'theladylike': 'Izzy', 'devoidlazarus': 'Jordan',
             'scrubcabbage': 'Josh', 'triplex1195': 'JT', 'lilymoding': 'Lily',
             'xltwinmattress': 'Matt', 'ventusverus': 'Patrick', 'kingofspaghetti0': 'THT',
-            'timr35': 'Tim', 'verysinistea': 'Vivi', 'crispywill': 'Will',
+            'timr35': 'Tim', 'verysinistea': 'Vivi', 'crispywill': 'Will', 'alicefx': 'Che',
         };
         // ---------------------------------
         
@@ -180,7 +180,7 @@
 async function getJsonData(u) {
     // FIX: Prepend a CORS proxy URL to bypass the 'Failed to fetch' cross-origin error.
 	const url = u + ".json";
-    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+    const proxyUrl = '[https://corsproxy.io/?url=';
     const finalUrl = proxyUrl + encodeURIComponent(url);
     
     console.log("Fetching URL via proxy:", finalUrl);
